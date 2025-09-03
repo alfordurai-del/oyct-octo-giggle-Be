@@ -2,7 +2,9 @@ import "dotenv/config"; // Load .env variables first
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { createServer, type Server as HttpServer } from "http";
-import { registerRoutes, db } from "./routes";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { registerRoutes } from "./routes";
 import { initializeStorage, storage } from "./storage";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,6 +15,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// --- Database Setup ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+const db = drizzle(pool);
 
 // --- Global Middleware (Applied to all routes) ---
 app.use(
@@ -41,13 +49,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // --- Request Logging Middleware ---
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   const requestPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined;
 
   const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  res.json = function (bodyJson: any, ...args: any[]) {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
@@ -84,6 +92,7 @@ app.use((req, res, next) => {
     initializeStorage(db);
 
     // Perform initial seeding and update on server start
+    console.log("Database URL:", process.env.DATABASE_URL);
     console.log("Performing initial cryptocurrency data seeding and price update...");
     await storage.seedCryptocurrencies();
     await storage.updateAllCryptocurrencies();
@@ -104,7 +113,7 @@ app.use((req, res, next) => {
     // Register API routes
     await registerRoutes(app);
 
-    // Always just create server (no vite/serveStatic)
+    // Create HTTP server
     httpServer = createServer(app);
 
     // Error handling middleware (last)
@@ -115,13 +124,12 @@ app.use((req, res, next) => {
       console.log(`Error: ${message}, Status Code: ${status}`);
     });
 
-    // Start server
-    const port = process.env.PORT || 3000;
-    httpServer.listen(port, "0.0.0.0", () => {
-      console.log(`Server running at http://0.0.0.0:${port}`);
-      console.log(
-        `Test your API at: http://localhost:${port}/api/cryptocurrencies`
-      );
+    // Start server with alwaysdata-compatible configuration
+    const port = process.env.ALWAYSDATA_HTTPD_PORT || process.env.PORT || 3000;
+    const host = process.env.ALWAYSDATA_HTTPD_IP || "0.0.0.0";
+    httpServer.listen(port, host, () => {
+      console.log(`Server running at http://${host}:${port}`);
+      console.log(`Test your API at: http://localhost:${port}/api/cryptocurrencies`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
