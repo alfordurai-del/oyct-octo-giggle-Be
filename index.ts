@@ -1,4 +1,3 @@
-import "dotenv/config"; // Load .env variables first
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { createServer, type Server as HttpServer } from "http";
@@ -92,6 +91,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     initializeStorage(db);
 
     // Perform initial seeding and update on server start
+    console.log("All env vars:", process.env);
     console.log("Database URL:", process.env.DATABASE_URL);
     console.log("Performing initial cryptocurrency data seeding and price update...");
     await storage.seedCryptocurrencies();
