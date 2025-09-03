@@ -117,8 +117,9 @@ app.use((req, res, next) => {
 
     // Start server
     const port = process.env.PORT || 3000;
-    httpServer.listen(port, "0.0.0.0", () => {
-      console.log(`Server running at http://0.0.0.0:${port}`);
+    const host = process.env.IP || '0.0.0.0'; // Added this line
+    httpServer.listen(port, host, () => { // Updated this line
+      console.log(`Server running at http://${host}:${port}`);
       console.log(
         `Test your API at: http://localhost:${port}/api/cryptocurrencies`
       );
