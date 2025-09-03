@@ -7,8 +7,8 @@
     "build": "esbuild index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "dev": "DATABASE_URL=$DATABASE_URL NODE_ENV=development tsx index.ts",
-    "start": "DATABASE_URL=$DATABASE_URL NODE_ENV=production node dist/index.js"
+    "dev": "NODE_ENV=development tsx index.ts",
+    "start": "NODE_ENV=production node dist/index.js"
   },
   "devDependencies": {
     "@types/express": "4.17.21",
