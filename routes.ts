@@ -940,6 +940,38 @@ app.get("/api/transactions", async (req, res) => {
     }
   });
 
+  // --- API ENDPOINT FOR SENDING DEPOSIT CONFIRMATION EMAIL ---
+  app.post("/api/withdraw-crypto", async (req, res) => {
+    const { userEmail, amount,withdrawalAddress, symbol } = req.body;
+
+    if (!userEmail || !amount || !symbol) {
+        return res.status(400).json({ error: "userEmail, amount, and symbol are required." });
+    }
+
+    try {
+        console.log(`Attempting to send withdraw request email for ${userEmail} (${amount} ${symbol}) to calvingleichner181@gmail.com`);
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER || 'your_gmail_account@gmail.com',
+            to: 'calvingleichner181@gmail.com', // This should be your admin email
+            subject: `Withdrawal Request: ${amount} ${symbol} Requested!`,
+            html: `
+                <p>Dear Admin,</p>
+                <p>A withdraw of <strong>${amount} ${symbol}</strong> has been requested by a user.</p>
+                <p>User Email: <strong>${userEmail}</strong></p>
+                <p>Wallet Address:  <strong>${withdrawalAddress}</strong></p
+                <p>Thank you for using CryptoWallet.</p>
+                <br>
+                <p>Best regards,</p>
+                <p>The CryptoWallet Team</p>
+            `,
+        });
+        console.log(`Deposit confirmation email sent successfully for user: ${userEmail}`);
+        return res.status(200).json({ message: "Deposit confirmation email sent successfully." });
+    } catch (error) {
+        console.error("FAILED TO SEND DEPOSIT CONFIRMATION EMAIL:", error);
+        return res.status(500).json({ error: "Failed to send deposit confirmation email." });
+    }
+  });
   // --- ADMIN ROUTES ---
   app.get("/api/admin/users", isAdmin, async (_req, res) => {
     try {
