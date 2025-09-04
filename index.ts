@@ -18,8 +18,7 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "http://localhost:3000",
-      "https://new-hive.netlify.app",
+      "https://new-hive.com",
       "https://pi-coin-converter.netlify.app",
       "https://pi-converter.netlify.app",
     ],
