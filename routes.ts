@@ -13,6 +13,7 @@ import {
   trades, // Explicitly import trades schema
   type UserProfile, // Assuming this type is defined in @shared/schema
   insertTradeSchema,
+  notifications,
   selectTradeSchema, // For mapping DB results to frontend Trade type
   type Account, // Type for accounts table select
   type InsertAccount, // Type for accounts table insert (DB format)
@@ -45,6 +46,9 @@ const schema = {
 };
 
 export const db = drizzle(pool, { schema });
+const eq = (field, value) => ({ type: 'eq', field, value });
+const and = (...conditions) => ({ type: 'and', conditions });
+const v4 = uuidv4;
 
 // Helper to convert numbers/strings to string for Drizzle decimal types
 const numToString = (val: number | string | null | undefined): string | null => {
@@ -506,6 +510,46 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // --- NEW Notification Routes ---
+// POST /api/notifications
+app.post("/api/notifications", async (req, res) => {
+  try {
+    const { userId, title, message } = req.body;
+    if (!userId || !title || !message) {
+      return res.status(400).json({ error: "userId, title, and message are required." });
+    }
+    await db.insert(notifications).values({ user_id: userId, title, message });
+    return res.status(201).json({ message: "Notification created successfully." });
+  } catch (error) {
+    console.error("Failed to create notification:", error);
+    return res.status(500).json({ error: "Failed to create notification." });
+  }
+});
+
+// GET /api/notifications/:userId
+app.get("/api/notifications/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userNotifications = await db.select().from(notifications).where(eq(notifications.user_id, userId));
+    return res.status(200).json(userNotifications);
+  } catch (error) {
+    console.error("Failed to fetch notifications:", error);
+    return res.status(500).json({ error: "Failed to fetch notifications." });
+  }
+});
+
+// PATCH /api/notifications/read/:id
+app.patch("/api/notifications/read/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.update(notifications).set({ read: true, updated_at: new Date() }).where(eq(notifications.id, id));
+    return res.status(200).json({ message: "Notification marked as read." });
+  } catch (error) {
+    console.error("Failed to update notification status:", error);
+    return res.status(500).json({ error: "Failed to update notification status." });
+  }
+});
+
   // --- Investment Routes ---
   app.post("/api/invest", async (req, res) => {
     const { userId, amount, strategyId } = req.body;
@@ -886,27 +930,53 @@ app.get("/api/transactions", async (req, res) => {
   });
 
   // --- UPDATE USER BALANCE ENDPOINT ---
-  app.post("/api/update-balance", async (req, res) => {
-    const { userId, balance } = req.body;
-    if (!userId || typeof balance !== "number") {
-      return res.status(400).json({ error: "userId and numeric balance are required." });
+app.post("/api/update-balance", async (req, res) => {
+  const { userId, balance } = req.body;
+  if (!userId || typeof balance !== "number") {
+    return res.status(400).json({ error: "userId and numeric balance are required." });
+  }
+  try {
+    const balanceStr = numToString(balance);
+    const [updated] = await db
+      .update(accounts) // Use directly imported accounts
+      .set({ balance: balanceStr })
+      .where(eq(accounts.id, userId)) // Use directly imported accounts
+      .returning();
+    if (!updated) {
+      return res.status(404).json({ error: "User not found." });
     }
+
+    // --- NEW: Post a notification after a successful balance update ---
     try {
-      const balanceStr = numToString(balance);
-      const [updated] = await db
-        .update(accounts) // Use directly imported accounts
-        .set({ balance: balanceStr })
-        .where(eq(accounts.id, userId)) // Use directly imported accounts
-        .returning();
-      if (!updated) {
-        return res.status(404).json({ error: "User not found." });
+      const notificationPayload = {
+        userId: updated.id,
+        title: "Demo Balance Granted",
+        message: `Your demo balance of $${parseFloat(updated.balance)} has been credited to your account.`,
+      };
+      
+      const notificationRes = await fetch("http://localhost:6061/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notificationPayload),
+      });
+
+      if (!notificationRes.ok) {
+        // Log the error but don't fail the primary balance update request
+        console.error("Failed to post notification:", await notificationRes.text());
       }
-      return res.json({ success: true, balance: parseFloat(updated.balance.toString()) });
-    } catch (error) {
-      console.error("Failed to update balance:", error);
-      return res.status(500).json({ error: "Failed to update balance" });
+
+    } catch (notificationError) {
+      // Catch network or other errors for the notification call
+      console.error("Error sending notification:", notificationError);
     }
-  });
+    // --- END NEW FUNCTIONALITY ---
+
+    return res.json({ success: true, balance: parseFloat(updated.balance.toString()) });
+  } catch (error) {
+    console.error("Failed to update balance:", error);
+    return res.status(500).json({ error: "Failed to update balance" });
+  }
+});
 
   // --- API ENDPOINT FOR SENDING DEPOSIT CONFIRMATION EMAIL ---
   app.post("/api/send-deposit-email", async (req, res) => {

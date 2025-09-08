@@ -1,4 +1,3 @@
-// @shared/schema/index.ts
 import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -33,7 +32,6 @@ export const strategies = pgTable('strategies', {
   maxDrawdown: decimal('max_drawdown'),
   duration_days: integer('duration_days').notNull(), // ADDED: duration_days column
 });
-
 
 // Cryptocurrencies Table - CRITICAL CHANGES HERE
 export const cryptocurrencies = pgTable("cryptocurrencies", {
@@ -110,6 +108,17 @@ export const trades = pgTable("trades", {
   outcome: text("outcome"), // 'win' or 'loss' or 'draw'
 });
 
+// --- NEW NOTIFICATIONS TABLE ---
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey().$defaultFn(() => uuidv4()),
+  user_id: text("user_id").references(() => accounts.id).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 
 // --- REVISED ZOD SCHEMAS ---
 
@@ -164,6 +173,13 @@ export const insertAccountSchema = createInsertSchema(accounts).omit({
   balance: z.union([z.number().min(0), z.string()]).optional(), // Allow number or string for balance input
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  read: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export inferred types for use throughout your application
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -175,3 +191,5 @@ export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type Trade = typeof trades.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;
 export type Account = typeof accounts.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

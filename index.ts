@@ -19,6 +19,7 @@ app.use(
   cors({
     origin: [
       "https://new-hive.com",
+      "http://localhost:3000",
       "https://pi-coin-converter.netlify.app",
       "https://pi-converter.netlify.app",
     ],
