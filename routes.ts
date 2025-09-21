@@ -46,8 +46,6 @@ const schema = {
 };
 
 export const db = drizzle(pool, { schema });
-const eq = (field, value) => ({ type: 'eq', field, value });
-const and = (...conditions) => ({ type: 'and', conditions });
 const v4 = uuidv4;
 
 // Helper to convert numbers/strings to string for Drizzle decimal types
@@ -730,13 +728,19 @@ app.patch("/api/notifications/read/:id", async (req, res) => {
         return res.status(404).json({ error: "User account not found." });
       }
 
-      const currentBalance = parseFloat(userAccount.balance);
-      const tradeAmount = parseFloat(numToString(validatedData.amount) || '0'); // Ensure tradeAmount is a number
+      const currentBalance = Number(String(userAccount.balance).replace(/,/g, ''));
+const tradeAmount = Number(validatedData.amount);
 
-      if (currentBalance < tradeAmount) {
-        console.warn(`[Backend] Insufficient balance for user ${validatedData.userId}. Current: ${currentBalance}, Attempted: ${tradeAmount}`);
-        return res.status(400).json({ error: "Insufficient balance." });
-      }
+console.log(`[CHECK] currentBalance=${currentBalance}, tradeAmount=${tradeAmount}`);
+
+if (isNaN(currentBalance) || isNaN(tradeAmount)) {
+  return res.status(400).json({ error: "Invalid balance or trade amount." });
+}
+
+if (currentBalance < tradeAmount) {
+  return res.status(400).json({ error: "Insufficient balance." });
+}
+
 
       const newBalance = currentBalance - tradeAmount;
       await db
